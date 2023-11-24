@@ -16,4 +16,4 @@ class WorkerRushBot(BotAI):
 run_game(maps.get("sc2-ai-cup-2022"), [
     Bot(Race.Terran, WorkerRushBot()),
     Computer(Race.Terran, Difficulty.Medium)
-], realtime=True)
+], realtime=False)

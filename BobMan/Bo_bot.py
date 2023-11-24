@@ -7,37 +7,45 @@ from sc2.constants import *
 from sc2.bot_ai import BotAI, Race
 from sc2.data import Result
 from sc2.ids.unit_typeid import UnitTypeId
+from workerRushBot import WorkerRushBot
 
 class Bo_bot(BotAI):
     NAME: str = "MarineRushBot"
     RACE: Race = Race.Terran
     
-    first_wave =False
+    
     async def on_step(self, iteration: int):
         # Jestliže mám Command Center
         if self.townhalls:
             # První Command Center
             cc = self.townhalls[0]
-            
+
+            await self.distribute_workers()
+
             for depo in self.structures(UnitTypeId.SUPPLYDEPOT).ready:
                 self.do(depo(AbilityId.MORPH_SUPPLYDEPOT_LOWER))
 
             # Trénování SCV
             # Bot trénuje nová SCV, jestliže je jich méně než 17 (max_scvs) zvyšuje se počtem refinery
-            max_scvs = 16
+            max_scvs = 17
+            max_scvs = max_scvs + (self.structures(UnitTypeId.REFINERY).amount * 3) + (self.structures(UnitTypeId.COMMANDCENTER).amount * 10)
+            max_barracks = 4
+            if self.structures(UnitTypeId.COMMANDCENTER).amount >1:
+                max_barracks = 6
+
+            self.townhalls.collecting
 
             #Postav refinery na geysirech blizsich nez 20 od CC
             vaspenes = self.vespene_geyser.closer_than(20.0, cc)
-            if vaspenes is not None and self.structures(UnitTypeId.BARRACKS).amount > 3:    
+            if vaspenes is not None and self.structures(UnitTypeId.BARRACKS).amount > 1:    
                 for vaspene in vaspenes:
                     if not self.can_afford(UnitTypeId.REFINERY):
                         break
                     worker = self.select_build_worker(vaspene.position)
                     if worker is None:
                         break
-                    if not self.units(UnitTypeId.REFINERY).closer_than(1.0, vaspene).exists and self.structures(UnitTypeId.REFINERY).amount<1 and not self.already_pending(UnitTypeId.REFINERY):
+                    if not self.units(UnitTypeId.REFINERY).closer_than(1.0, vaspene).exists and self.structures(UnitTypeId.REFINERY).amount<2 and not self.already_pending(UnitTypeId.REFINERY):
                         await self.build(UnitTypeId.REFINERY, vaspene)
-                        max_scvs = max_scvs + self.structures(UnitTypeId.REFINERY).amount * 3
                         break
 
 
@@ -47,7 +55,9 @@ class Bo_bot(BotAI):
             # Zbylé SCV bot pošle těžit minerály nejblíže Command Center
                 #zacnu resit az mam rafinerky
                 #prochazim rafinerky, ktere postupne zaplnuju
-            if self.structures(UnitTypeId.REFINERY).ready.amount > 0: 
+            
+            """  if self.structures(UnitTypeId.REFINERY).ready.amount > 0: 
+                
                 if cc.assigned_harvesters > cc.ideal_harvesters or self.idle_worker_count > 0:
                     for r in self.structures(UnitTypeId.REFINERY):
                         # TODO2x assigned < ideal
@@ -59,16 +69,21 @@ class Bo_bot(BotAI):
                         # TODO 2x assigned < ideal        
                         if r.assigned_harvesters < r.ideal_harvesters :
                             #TODO ziskat harvestory co aktualne pracuju na mineraloch a jendoho z nich vzit
-                            # HELP - udelat si napr 3 pole. jedno pole vsech harvestoru, druhe pole harvestoru na mineraloch a treti na gas. 
+                            # HELP - udelat si napr 3 pole. jedno pole vsech harvestoru, druhe pole harvestoru na mineraloch a treti na. 
                             # PROBLEM - co udela harvestor po tom co se vytvori.. proste nekam automaticky jde.. je potreba ho odchytit
-                            w = self.workers.first.closest_to(cc)
+                            w = self.workers.closer_than(15, cc).first
+                            #w = self.workers.first.closest_to(cc) TODO remake this cause errors
                             w.gather(r)
+                            pass
                         if r.assigned_harvesters > r.ideal_harvesters:
-                            w = self.workers.collecting(r)
+                            w = self.workers.collecting([r]).random()
                             w.gather(self.mineral_field.closest_to(cc))
             else:
                 for scv in self.workers.idle:
-                    scv.gather(self.mineral_field.closest_to(cc))
+                    scv.gather(self.mineral_field.closest_to(cc)) 
+            """
+            
+
             
             """ if self.structures(UnitTypeId.REFINERY).ready.amount > 0: #zacnu resit az mam rafinerky
                 mineral_workers=[]
@@ -103,7 +118,8 @@ class Bo_bot(BotAI):
                     # SCV pro stavbu bude vybráno automaticky viz dokumentace
                     await self.build(
                         UnitTypeId.SUPPLYDEPOT,
-                        near=cc.position.towards(self.game_info.map_center, 8))
+                        near=cc.position.towards(self.game_info.map_center, 8)
+                        )
 
 
             # Stavba Barracks
@@ -114,7 +130,7 @@ class Bo_bot(BotAI):
                     if self.can_afford(UnitTypeId.BARRACKS) and not self.already_pending(UnitTypeId.BARRACKS):
                         await self.build(
                             UnitTypeId.BARRACKS,
-                            near=cc.position.towards(self.game_info.map_center, 8))
+                            near=cc.position.towards(self.game_info.map_center, 8), placement_step=6)
 
             
             
@@ -130,9 +146,6 @@ class Bo_bot(BotAI):
                     self.all_barrack_train(UnitTypeId.MARAUDER)
                 
                     
-                        
-
-                
 
             # Útok s jednotkou Marine
             # Má-li bot více než 15 volných jednotek Marine, zaútočí na náhodnou nepřátelskou budovu nebo se přesune na jeho startovní pozici
@@ -154,19 +167,35 @@ class Bo_bot(BotAI):
             if self.structures(UnitTypeId.ENGINEERINGBAY).amount==1 and self.can_afford(AbilityId.RESEARCH_TERRANINFANTRYWEAPONS):
                 self.do(self.structures(UnitTypeId.ENGINEERINGBAY).first(AbilityId.RESEARCH_TERRANINFANTRYWEAPONS))
                 
-            #if self.structures(UnitTypeId.BARRACKS).amount==1 and self.can_afford(AbilityId.research_terran):
-                #self.do(self.structures(UnitTypeId.ENGINEERINGBAY).first(AbilityId.RESEARCH_TERRANINFANTRYWEAPONS))
-                #pass
+            
+            await self.upgrade_barracs()
+            
 
+            if self.structures(UnitTypeId.BARRACKS).amount==4 and self.can_afford(UnitTypeId.COMMANDCENTER):
+                worker = self.workers.gathering.random
+                worker.build(UnitTypeId.COMMANDCENTER, await self.get_next_expansion())
+            
                 
     def all_barrack_train(self, unitType):
         if self.can_afford(unitType):
             for barrack in self.structures(UnitTypeId.BARRACKS).idle:
-                barrack.train(unitType)                
+                barrack.train(unitType)      
 
+    async def upgrade_barracs(self):
+        for i,barrack in enumerate(self.structures(UnitTypeId.BARRACKS)):
+            if i%2 == 1:
+                if self.can_afford(AbilityId.BUILD_REACTOR_BARRACKS):
+                    self.do(barrack(AbilityId.BUILD_REACTOR_BARRACKS))
+            else:
+                if self.can_afford(AbilityId.BUILD_TECHLAB_BARRACKS):
+                    self.do(barrack(AbilityId.BUILD_TECHLAB_BARRACKS))
+
+    
 run_game(maps.get("sc2-ai-cup-2022"), [
+    Bot(Race.Terran, WorkerRushBot()),
     Bot(Race.Terran, Bo_bot()),
-    Computer(Race.Terran, Difficulty.Easy)
+    #Computer(Race.Terran, Difficulty.Easy)
+    
 ], realtime=False)
 
 
