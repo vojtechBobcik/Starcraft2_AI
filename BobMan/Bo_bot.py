@@ -189,6 +189,8 @@ class Bo_bot(BotAI):
             else:
                 if self.can_afford(AbilityId.BUILD_TECHLAB_BARRACKS):
                     self.do(barrack(AbilityId.BUILD_TECHLAB_BARRACKS))
+            #hello
+            
 
     
 run_game(maps.get("sc2-ai-cup-2022"), [
