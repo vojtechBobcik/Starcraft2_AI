@@ -61,11 +61,12 @@ class Bo_bot(BotAI):
                             #TODO ziskat harvestory co aktualne pracuju na mineraloch a jendoho z nich vzit
                             # HELP - udelat si napr 3 pole. jedno pole vsech harvestoru, druhe pole harvestoru na mineraloch a treti na gas. 
                             # PROBLEM - co udela harvestor po tom co se vytvori.. proste nekam automaticky jde.. je potreba ho odchytit
-                            w = self.workers.first.closest_to(cc)
+                            w = self.workers.closest_to(cc)
                             w.gather(r)
                         if r.assigned_harvesters > r.ideal_harvesters:
-                            w = self.workers.collecting(r)
-                            w.gather(self.mineral_field.closest_to(cc))
+                            #w = self.workers.collecting()
+                            #w.gather(self.mineral_field.closest_to(cc))
+                            pass
             else:
                 for scv in self.workers.idle:
                     scv.gather(self.mineral_field.closest_to(cc))
@@ -115,6 +116,7 @@ class Bo_bot(BotAI):
                         await self.build(
                             UnitTypeId.BARRACKS,
                             near=cc.position.towards(self.game_info.map_center, 8))
+                        print(self.get_available_abilities(UnitTypeId.BARRACKS).__name__)
 
             
             
@@ -127,21 +129,22 @@ class Bo_bot(BotAI):
                 if self.units(UnitTypeId.MARINE).amount <18:
                     self.all_barrack_train(UnitTypeId.MARINE)
                 else:
-                    self.all_barrack_train(UnitTypeId.MARAUDER)
-                
-                    
-                        
-
+                    self.all_barrack_train(UnitTypeId.REAPER)
                 
 
             # Útok s jednotkou Marine
             # Má-li bot více než 15 volných jednotek Marine, zaútočí na náhodnou nepřátelskou budovu nebo se přesune na jeho startovní pozici
             idle_marines = self.units(UnitTypeId.MARINE).idle
-            if idle_marines.amount > 18:
+            idle_reapers = self.units(UnitTypeId.REAPER).idle
+            if idle_marines.amount > 18 and idle_reapers.amount >6:
                 target = self.enemy_structures.random_or(
                     self.enemy_start_locations[0]).position
                 for marine in idle_marines:
                     marine.attack(target)
+                for reaper in   idle_reapers:
+                    reaper.attack(target)
+            
+
 
             
             # Stavba EngineeringBay pokud 
@@ -152,7 +155,8 @@ class Bo_bot(BotAI):
             
                 
             if self.structures(UnitTypeId.ENGINEERINGBAY).amount==1 and self.can_afford(AbilityId.RESEARCH_TERRANINFANTRYWEAPONS):
-                self.do(self.structures(UnitTypeId.ENGINEERINGBAY).first(AbilityId.RESEARCH_TERRANINFANTRYWEAPONS))
+                engineeringBay = self.structures(UnitTypeId.ENGINEERINGBAY).first
+                self.do(engineeringBay(AbilityId.RESEARCH_TERRANINFANTRYWEAPONS))
                 
             #if self.structures(UnitTypeId.BARRACKS).amount==1 and self.can_afford(AbilityId.research_terran):
                 #self.do(self.structures(UnitTypeId.ENGINEERINGBAY).first(AbilityId.RESEARCH_TERRANINFANTRYWEAPONS))
