@@ -183,6 +183,13 @@ class Bo_bot(BotAI):
                 worker = self.workers.gathering.random
                 worker.build(UnitTypeId.COMMANDCENTER, await self.get_next_expansion())
             
+            if self.structures(UnitTypeId.BARRACKS).amount>2:
+                self.createFactory()
+            
+            if self.structures(UnitTypeId.FACTORY):
+                if self.units(UnitTypeId.SIEGETANK).amount <4:
+                    self.all_barrack_train(UnitTypeId.SIEGETANK)
+            
                 
     def all_barrack_train(self, unitType):
         if self.can_afford(unitType):
@@ -197,7 +204,13 @@ class Bo_bot(BotAI):
             else:
                 if self.can_afford(AbilityId.BUILD_TECHLAB_BARRACKS):
                     self.do(barrack(AbilityId.BUILD_TECHLAB_BARRACKS))
-            #hello
+    
+    async def createFactory(self):
+        if self.can_afford(UnitTypeId.FACTORY) and not self.already_pending(UnitTypeId.BARRACKS):
+            await self.build(
+                UnitTypeId.FACTORY,
+                near=self.townhalls[0].position.towards(self.game_info.map_center, 8), placement_step=6)
+                
         
     
 run_game(maps.get("sc2-ai-cup-2022"), [
