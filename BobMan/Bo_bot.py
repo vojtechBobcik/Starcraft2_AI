@@ -7,7 +7,7 @@ from sc2.constants import *
 from sc2.bot_ai import BotAI, Race
 from sc2.data import Result
 from sc2.ids.unit_typeid import UnitTypeId
-from workerRushBot import WorkerRushBot
+
 
 class Bo_bot(BotAI):
     NAME: str = "MarineRushBot"
@@ -19,8 +19,16 @@ class Bo_bot(BotAI):
         if self.townhalls:
             # První Command Center
             cc = self.townhalls[0]
-
-            await self.distribute_workers()
+            enemy_SCV = self.enemy_units(UnitTypeId.SCV)
+            
+            if enemy_SCV.closer_than(7,cc).amount>=1:
+                close_enemy_scv = enemy_SCV.closer_than(7,cc)
+                for worker in self.workers:
+                    worker.attack(close_enemy_scv)
+            else:
+                await self.distribute_workers()
+            
+            
 
             for depo in self.structures(UnitTypeId.SUPPLYDEPOT).ready:
                 self.do(depo(AbilityId.MORPH_SUPPLYDEPOT_LOWER))
@@ -190,13 +198,12 @@ class Bo_bot(BotAI):
                 if self.can_afford(AbilityId.BUILD_TECHLAB_BARRACKS):
                     self.do(barrack(AbilityId.BUILD_TECHLAB_BARRACKS))
             #hello
-            
-
+        
     
 run_game(maps.get("sc2-ai-cup-2022"), [
-    Bot(Race.Terran, WorkerRushBot()),
+    #Bot(Race.Terran, WorkerRushBot()),
     Bot(Race.Terran, Bo_bot()),
-    #Computer(Race.Terran, Difficulty.Easy)
+    Computer(Race.Terran, Difficulty.Easy)
     
 ], realtime=False)
 
