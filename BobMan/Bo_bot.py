@@ -19,16 +19,15 @@ class Bo_bot(BotAI):
         if self.townhalls:
             # První Command Center
             cc = self.townhalls[0]
-            enemy_SCV = self.enemy_units(UnitTypeId.SCV)
+            """ enemy_SCV = self.enemy_units(UnitTypeId.SCV)
             
-            if enemy_SCV.closer_than(7,cc).amount>=1:
+            if enemy_SCV.closer_than(7,self.structures).amount>=1:
                 close_enemy_scv = enemy_SCV.closer_than(7,cc)
                 for worker in self.workers:
                     worker.attack(close_enemy_scv)
             else:
-                await self.distribute_workers()
-            
-            
+                await self.distribute_workers() """
+            await self.distribute_workers()
 
             for depo in self.structures(UnitTypeId.SUPPLYDEPOT).ready:
                 self.do(depo(AbilityId.MORPH_SUPPLYDEPOT_LOWER))
@@ -36,12 +35,9 @@ class Bo_bot(BotAI):
             # Trénování SCV
             # Bot trénuje nová SCV, jestliže je jich méně než 17 (max_scvs) zvyšuje se počtem refinery
             max_scvs = 17
-            max_scvs = max_scvs + (self.structures(UnitTypeId.REFINERY).amount * 3) + (self.structures(UnitTypeId.COMMANDCENTER).amount * 10)
-            max_barracks = 4
-            if self.structures(UnitTypeId.COMMANDCENTER).amount >1:
-                max_barracks = 6
+            max_scvs = max_scvs + (self.structures(UnitTypeId.REFINERY).amount * 3) + (self.structures(UnitTypeId.COMMANDCENTER).amount * 10)-10
 
-            self.townhalls.collecting
+            
 
             #Postav refinery na geysirech blizsich nez 20 od CC
             vaspenes = self.vespene_geyser.closer_than(20.0, cc)
@@ -56,79 +52,38 @@ class Bo_bot(BotAI):
                         await self.build(UnitTypeId.REFINERY, vaspene)
                         break
 
-
             if self.can_afford(UnitTypeId.SCV) and self.supply_workers <= max_scvs and cc.is_idle:
                 cc.train(UnitTypeId.SCV)
-            
-            # Zbylé SCV bot pošle těžit minerály nejblíže Command Center
-                #zacnu resit az mam rafinerky
-                #prochazim rafinerky, ktere postupne zaplnuju
-            
-            """  if self.structures(UnitTypeId.REFINERY).ready.amount > 0: 
-                
-                if cc.assigned_harvesters > cc.ideal_harvesters or self.idle_worker_count > 0:
-                    for r in self.structures(UnitTypeId.REFINERY):
-                        # TODO2x assigned < ideal
-                        if r.assigned_harvesters < r.ideal_harvesters and self.idle_worker_count > 0 :
-                            idle_SCVs=[x for x in self.units(UnitTypeId.SCV).idle]
-                            for idle_SCV in idle_SCVs:
-                                idle_SCV.gather(r)
-                            
-                        # TODO 2x assigned < ideal        
-                        if r.assigned_harvesters < r.ideal_harvesters :
-                            #TODO ziskat harvestory co aktualne pracuju na mineraloch a jendoho z nich vzit
-                            # HELP - udelat si napr 3 pole. jedno pole vsech harvestoru, druhe pole harvestoru na mineraloch a treti na. 
-                            # PROBLEM - co udela harvestor po tom co se vytvori.. proste nekam automaticky jde.. je potreba ho odchytit
-                            w = self.workers.closer_than(15, cc).first
-                            #w = self.workers.first.closest_to(cc) TODO remake this cause errors
-                            w.gather(r)
-                            pass
-                        if r.assigned_harvesters > r.ideal_harvesters:
-                            w = self.workers.collecting([r]).random()
-                            w.gather(self.mineral_field.closest_to(cc))
-            else:
-                for scv in self.workers.idle:
-                    scv.gather(self.mineral_field.closest_to(cc)) 
-            """
-            
-
-            
-            """ if self.structures(UnitTypeId.REFINERY).ready.amount > 0: #zacnu resit az mam rafinerky
-                mineral_workers=[]
-                gas_workers=[]
-                if self.assignBots:
-                    free_workers=[]
-                    free_workers.append(self.workers.idle)
-                    self.assignBots=False
-
-                for r in self.structures(UnitTypeId.REFINERY):
-                    for x in free_workers:
-                        if len(gas_workers)<r.ideal_harvesters:
-                            gas_workers.append(x)
-                            x.gather(r)
-                        if len(mineral_workers)<cc.ideal_harvesters:
-                            mineral_workers.append(x)
-                            x.gather(self.mineral_field.closest_to(cc))
-
-                    
-                    if self.idle_worker_count > 0 :
-                        idle_SCVs=[x for x in self.units(UnitTypeId.SCV).idle]
-                        for idle_SCV in idle_SCVs:
-                            mineral_workers.append(idle_SCV) """
-                    
-
-                
 
             # Postav Supply Depot, jestliže zbývá méně než 6 supply a je využito více než 13
-            if self.supply_left < 6 and self.supply_used >= 14 and not self.already_pending(UnitTypeId.SUPPLYDEPOT):
+            
+            depot_placement_positions = self.main_base_ramp.corner_depots
+            
+            depots = self.units(UnitTypeId.SUPPLYDEPOT) | self.units(UnitTypeId.SUPPLYDEPOTLOWERED)
+            
+            # Filter locations close to finished supply depots
+            if depots:
+                depot_placement_positions = {d for d in depot_placement_positions if depots.closest_distance_to(d) > 1}
+                
+            # Build depots
+            if self.can_afford(UnitTypeId.SUPPLYDEPOT) and not self.already_pending(UnitTypeId.SUPPLYDEPOT):
+                if len(depot_placement_positions) == 0:
+                    return
+                # Choose any depot location
+                target_depot_location = depot_placement_positions.pop()
+                ws = self.workers.gathering
+                if ws: # if workers were found
+                    w = ws.random
+                    self.do(w.build(UnitTypeId.SUPPLYDEPOT, target_depot_location))
+                
+            """ if self.supply_left < 6 and self.supply_used >= 14 and not self.already_pending(UnitTypeId.SUPPLYDEPOT):
                 if self.can_afford(UnitTypeId.SUPPLYDEPOT):
                     # Budova bude postavena poblíž Command Center směrem ke středu mapy
                     # SCV pro stavbu bude vybráno automaticky viz dokumentace
                     await self.build(
                         UnitTypeId.SUPPLYDEPOT,
-                        near=cc.position.towards(self.game_info.map_center, 8)
-                        )
-
+                        near=cc.position.towards(self.game_info.map_center, 1)
+                        ) """
 
             # Stavba Barracks
             # Bot staví tak dlouho, dokud si může dovolit stavět Barracks a jejich počet je menší než 6
@@ -138,29 +93,24 @@ class Bo_bot(BotAI):
                     if self.can_afford(UnitTypeId.BARRACKS) and not self.already_pending(UnitTypeId.BARRACKS):
                         await self.build(
                             UnitTypeId.BARRACKS,
-                            near=cc.position.towards(self.game_info.map_center, 8), placement_step=6)
+                            near=cc.position.towards(self.game_info.map_center, 5), placement_step=5)
 
-            
-            
             # Trénování jednotek:
             # 18 marine
             # 6 marauder
             # Pouze, má-li bot postavené Barracks a může si jednotku dovolit
-            if self.structures(UnitTypeId.BARRACKS):
+            if self.structures(UnitTypeId.BARRACKS).exists:
                 # Každá budova Barracks trénuje v jeden čas pouze jednu jednotku (úspora zdrojů)
-                if self.units(UnitTypeId.MARINE).amount <18:
-                    self.all_barrack_train(UnitTypeId.MARINE)
+                if self.units(UnitTypeId.MARINE).amount <18 :
+                    await self.all_barrack_train(UnitTypeId.MARINE)
                 else:
-                    self.all_barrack_train(UnitTypeId.MARAUDER)
-                
-                    
+                    await self.all_barrack_train(UnitTypeId.MARAUDER)
 
             # Útok s jednotkou Marine
             # Má-li bot více než 15 volných jednotek Marine, zaútočí na náhodnou nepřátelskou budovu nebo se přesune na jeho startovní pozici
             idle_marines = self.units(UnitTypeId.MARINE).idle
             if idle_marines.amount > 18:
-                target = self.enemy_structures.random_or(
-                    self.enemy_start_locations[0]).position
+                target = self.enemy_structures.random_or(self.enemy_start_locations[0]).position
                 for marine in idle_marines:
                     marine.attack(target)
 
@@ -171,30 +121,39 @@ class Bo_bot(BotAI):
                             UnitTypeId.ENGINEERINGBAY,
                             near=cc.position.towards(self.game_info.map_center, 8))
             
-                
+            # vyzkum zbrani    
             if self.structures(UnitTypeId.ENGINEERINGBAY).amount==1 and self.can_afford(AbilityId.RESEARCH_TERRANINFANTRYWEAPONS):
                 self.do(self.structures(UnitTypeId.ENGINEERINGBAY).first(AbilityId.RESEARCH_TERRANINFANTRYWEAPONS))
                 
+            """ await self.upgrade_barracs() """
             
-            await self.upgrade_barracs()
-            
-
-            if self.structures(UnitTypeId.BARRACKS).amount==4 and self.can_afford(UnitTypeId.COMMANDCENTER):
-                worker = self.workers.gathering.random
-                worker.build(UnitTypeId.COMMANDCENTER, await self.get_next_expansion())
-            
+            #Postavení factory
             if self.structures(UnitTypeId.BARRACKS).amount>2:
-                self.createFactory()
-            
-            if self.structures(UnitTypeId.FACTORY):
-                if self.units(UnitTypeId.SIEGETANK).amount <4:
-                    self.all_barrack_train(UnitTypeId.SIEGETANK)
-            
+               await self.createFactory()
+               await self.upgrade_factory()
                 
-    def all_barrack_train(self, unitType):
+                
+            #Postavení nových commandcenter
+            if self.structures(UnitTypeId.BARRACKS).amount>=4 and self.structures(UnitTypeId.COMMANDCENTER).amount<2 and self.can_afford(UnitTypeId.COMMANDCENTER) and not self.already_pending(UnitTypeId.COMMANDCENTER):
+                worker = self.workers.gathering.random
+                if worker:
+                    worker.build(UnitTypeId.COMMANDCENTER, await self.get_next_expansion())
+           
+           #Vytrenovani siegeTanků 
+            if self.structures(UnitTypeId.FACTORY).exists and self.units(UnitTypeId.SIEGETANK).amount<6:
+                await self.all_factory_train(UnitTypeId.SIEGETANK)
+
+                
+                
+    async def all_barrack_train(self, unitType):
         if self.can_afford(unitType):
             for barrack in self.structures(UnitTypeId.BARRACKS).idle:
-                barrack.train(unitType)      
+                barrack.train(unitType)
+                
+    async def all_factory_train(self, unitType):
+        if self.can_afford(unitType):
+            for factory in self.structures(UnitTypeId.FACTORY).idle:
+                factory.train(unitType) 
 
     async def upgrade_barracs(self):
         for i,barrack in enumerate(self.structures(UnitTypeId.BARRACKS)):
@@ -205,12 +164,22 @@ class Bo_bot(BotAI):
                 if self.can_afford(AbilityId.BUILD_TECHLAB_BARRACKS):
                     self.do(barrack(AbilityId.BUILD_TECHLAB_BARRACKS))
     
+    async def upgrade_factory(self):
+        for factory in self.structures(UnitTypeId.FACTORY):
+            if self.can_afford(AbilityId.BUILD_TECHLAB_FACTORY):
+                self.do(factory(AbilityId.BUILD_TECHLAB_FACTORY))
+            
     async def createFactory(self):
-        if self.can_afford(UnitTypeId.FACTORY) and not self.already_pending(UnitTypeId.BARRACKS):
-            await self.build(
-                UnitTypeId.FACTORY,
-                near=self.townhalls[0].position.towards(self.game_info.map_center, 8), placement_step=6)
-                
+        if self.tech_requirement_progress(UnitTypeId.FACTORY) == 1:
+            # Je jich méně než 6 nebo se již nějaké nestaví
+            if self.structures(UnitTypeId.FACTORY).amount < 2:
+                if self.can_afford(UnitTypeId.FACTORY) and not self.already_pending(UnitTypeId.FACTORY):
+                    await self.build(
+                        UnitTypeId.FACTORY,
+                        near=self.townhalls[0].position.towards(self.game_info.map_center, 5), placement_step=5)
+    
+    
+    
         
     
 run_game(maps.get("sc2-ai-cup-2022"), [
